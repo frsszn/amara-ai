@@ -135,32 +135,3 @@ CREATE TABLE credit_assessments (
 );
 ```
 
----
-
-## Cost Estimate (MVP)
-
-| Resource | Cost/Month |
-|----------|------------|
-| Compute Engine (e2-standard-4) | $98 |
-| Cloud SQL (db-g1-small) | $25 |
-| Vertex AI Gemini | $50-100 |
-| **Total** | **~$175-225** |
-
-> 💡 $300 free credit covers ~2 months of MVP
-
----
-
-## Firewall Fix (Required)
-
-```bash
-# Enable HTTP/HTTPS
-gcloud compute instances add-tags instance-20251128-071147 \
-  --zone=asia-southeast2-a \
-  --tags=http-server,https-server
-
-gcloud compute firewall-rules create allow-http --allow tcp:80 --target-tags=http-server
-gcloud compute firewall-rules create allow-https --allow tcp:443 --target-tags=https-server
-```
-
----
-
