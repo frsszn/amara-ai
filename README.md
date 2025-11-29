@@ -10,10 +10,10 @@
 </p>
 <h1 align="center">
 <h1 align="center">
+<br>
+Amara AI: Credit risk assessment platform for microfinance lending. Combines ML predictions with Gemini AI analysis to evaluate loan applications.
+</h1>
 
-# Amara AI
-
-Credit risk assessment platform for microfinance lending. Combines ML predictions with Gemini AI analysis to evaluate loan applications.
 
 ## Features
 
