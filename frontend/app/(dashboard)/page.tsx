@@ -19,7 +19,34 @@ import {
   XCircle,
   Loader2,
 } from "lucide-react"
-import { getDashboardStats, getAssessments, formatCurrency } from "@/lib/data/api"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart"
+import {
+  Bar,
+  BarChart,
+  Pie,
+  PieChart,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+} from "recharts"
+import {
+  getDashboardStats,
+  getAssessments,
+  formatCurrency,
+  getRiskDistribution,
+  getAgeDistribution,
+  getLoanStatus,
+  getRecommendations,
+  type ChartDataPoint,
+} from "@/lib/data/api"
 import type { DashboardStats, CreditAssessment } from "@/lib/types"
 
 function getRiskBadgeVariant(risk: string | null) {
@@ -50,21 +77,85 @@ function getRecommendationIcon(rec: string | null) {
   }
 }
 
+const RISK_COLORS: Record<string, string> = {
+  LOW: "hsl(142, 76%, 36%)",
+  MEDIUM: "hsl(45, 93%, 47%)",
+  HIGH: "hsl(0, 84%, 60%)",
+  VERY_HIGH: "hsl(0, 72%, 51%)",
+}
+
+const AGE_COLORS: Record<string, string> = {
+  young: "hsl(210, 100%, 50%)",
+  adult: "hsl(142, 76%, 36%)",
+  mature: "hsl(45, 93%, 47%)",
+  senior: "hsl(280, 65%, 60%)",
+}
+
+const LOAN_STATUS_COLORS: Record<string, string> = {
+  CURRENT: "hsl(142, 76%, 36%)",
+  PAST_DUE: "hsl(0, 84%, 60%)",
+  CLOSED: "hsl(215, 20%, 65%)",
+}
+
+const RECOMMENDATION_COLORS: Record<string, string> = {
+  APPROVE: "hsl(142, 76%, 36%)",
+  REVIEW: "hsl(45, 93%, 47%)",
+  REJECT: "hsl(0, 84%, 60%)",
+}
+
+const riskChartConfig = {
+  LOW: { label: "Low Risk", color: RISK_COLORS.LOW },
+  MEDIUM: { label: "Medium Risk", color: RISK_COLORS.MEDIUM },
+  HIGH: { label: "High Risk", color: RISK_COLORS.HIGH },
+  VERY_HIGH: { label: "Very High Risk", color: RISK_COLORS.VERY_HIGH },
+}
+
+const ageChartConfig = {
+  young: { label: "Young (18-25)", color: AGE_COLORS.young },
+  adult: { label: "Adult (26-35)", color: AGE_COLORS.adult },
+  mature: { label: "Mature (36-50)", color: AGE_COLORS.mature },
+  senior: { label: "Senior (51+)", color: AGE_COLORS.senior },
+}
+
+const loanStatusChartConfig = {
+  CURRENT: { label: "Current", color: LOAN_STATUS_COLORS.CURRENT },
+  PAST_DUE: { label: "Past Due", color: LOAN_STATUS_COLORS.PAST_DUE },
+  CLOSED: { label: "Closed", color: LOAN_STATUS_COLORS.CLOSED },
+}
+
+const recommendationChartConfig = {
+  APPROVE: { label: "Approve", color: RECOMMENDATION_COLORS.APPROVE },
+  REVIEW: { label: "Review", color: RECOMMENDATION_COLORS.REVIEW },
+  REJECT: { label: "Reject", color: RECOMMENDATION_COLORS.REJECT },
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [assessments, setAssessments] = useState<CreditAssessment[]>([])
+  const [riskData, setRiskData] = useState<ChartDataPoint[]>([])
+  const [ageData, setAgeData] = useState<ChartDataPoint[]>([])
+  const [loanStatusData, setLoanStatusData] = useState<ChartDataPoint[]>([])
+  const [recommendationData, setRecommendationData] = useState<ChartDataPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [statsData, assessmentsData] = await Promise.all([
+        const [statsData, assessmentsData, riskDistribution, ageDistribution, loanStatus, recommendations] = await Promise.all([
           getDashboardStats(),
           getAssessments(5, 0),
+          getRiskDistribution().catch(() => []),
+          getAgeDistribution().catch(() => []),
+          getLoanStatus().catch(() => []),
+          getRecommendations().catch(() => []),
         ])
         setStats(statsData)
         setAssessments(assessmentsData)
+        setRiskData(riskDistribution)
+        setAgeData(ageDistribution)
+        setLoanStatusData(loanStatus)
+        setRecommendationData(recommendations)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data")
       } finally {
@@ -102,8 +193,6 @@ export default function DashboardPage() {
     )
   }
 
-  const totalAssessments = stats.low_risk_count + stats.medium_risk_count + stats.high_risk_count
-
   const statCards = [
     {
       title: "Total Borrowers",
@@ -140,6 +229,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* Stat Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
           <Card key={stat.title}>
@@ -159,8 +249,10 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+      {/* Charts Row 1 */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Risk Distribution Pie Chart */}
+        <Card>
           <CardHeader>
             <CardTitle>Risk Distribution</CardTitle>
             <CardDescription>
@@ -168,68 +260,166 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="size-3 rounded-full bg-green-500" />
-                  <span className="text-sm">Low Risk</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold">{stats.low_risk_count}</span>
-                  <span className="text-sm text-muted-foreground">
-                    ({totalAssessments > 0 ? Math.round((stats.low_risk_count / totalAssessments) * 100) : 0}%)
-                  </span>
-                </div>
+            {riskData.length > 0 ? (
+              <ChartContainer config={riskChartConfig} className="h-[300px]">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Pie
+                    data={riskData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                    labelLine={true}
+                  >
+                    {riskData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={RISK_COLORS[entry.name] || "hsl(215, 20%, 65%)"}
+                      />
+                    ))}
+                  </Pie>
+                  <ChartLegend content={<ChartLegendContent />} />
+                </PieChart>
+              </ChartContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                No data available
               </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-green-500"
-                  style={{ width: `${totalAssessments > 0 ? (stats.low_risk_count / totalAssessments) * 100 : 0}%` }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="size-3 rounded-full bg-yellow-500" />
-                  <span className="text-sm">Medium Risk</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold">{stats.medium_risk_count}</span>
-                  <span className="text-sm text-muted-foreground">
-                    ({totalAssessments > 0 ? Math.round((stats.medium_risk_count / totalAssessments) * 100) : 0}%)
-                  </span>
-                </div>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-yellow-500"
-                  style={{ width: `${totalAssessments > 0 ? (stats.medium_risk_count / totalAssessments) * 100 : 0}%` }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="size-3 rounded-full bg-red-500" />
-                  <span className="text-sm">High Risk</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold">{stats.high_risk_count}</span>
-                  <span className="text-sm text-muted-foreground">
-                    ({totalAssessments > 0 ? Math.round((stats.high_risk_count / totalAssessments) * 100) : 0}%)
-                  </span>
-                </div>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-red-500"
-                  style={{ width: `${totalAssessments > 0 ? (stats.high_risk_count / totalAssessments) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="col-span-3">
+        {/* Age Distribution Bar Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Age Distribution</CardTitle>
+            <CardDescription>
+              Borrowers by age group
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {ageData.length > 0 ? (
+              <ChartContainer config={ageChartConfig} className="h-[300px]">
+                <BarChart data={ageData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis
+                    dataKey="name"
+                    tickFormatter={(value) => {
+                      const labels: Record<string, string> = {
+                        young: "18-25",
+                        adult: "26-35",
+                        mature: "36-50",
+                        senior: "51+",
+                      }
+                      return labels[value] || value
+                    }}
+                  />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {ageData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={AGE_COLORS[entry.name] || "hsl(215, 20%, 65%)"}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                No data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row 2 */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Loan Status Pie Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Loan Status</CardTitle>
+            <CardDescription>
+              Distribution of loan statuses
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loanStatusData.length > 0 ? (
+              <ChartContainer config={loanStatusChartConfig} className="h-[300px]">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Pie
+                    data={loanStatusData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                    labelLine={true}
+                  >
+                    {loanStatusData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={LOAN_STATUS_COLORS[entry.name] || "hsl(215, 20%, 65%)"}
+                      />
+                    ))}
+                  </Pie>
+                  <ChartLegend content={<ChartLegendContent />} />
+                </PieChart>
+              </ChartContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                No data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recommendations Bar Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Loan Recommendations</CardTitle>
+            <CardDescription>
+              AI-powered loan decisions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recommendationData.length > 0 ? (
+              <ChartContainer config={recommendationChartConfig} className="h-[300px]">
+                <BarChart data={recommendationData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={80} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    {recommendationData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={RECOMMENDATION_COLORS[entry.name] || "hsl(215, 20%, 65%)"}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                No data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Assessments and Portfolio Info */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Recent Assessments</CardTitle>
             <CardDescription>Latest AI credit evaluations</CardDescription>
@@ -266,79 +456,51 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Recommendations</CardTitle>
+        <Card className="col-span-3">
+          <CardHeader>
+            <CardTitle>Portfolio Summary</CardTitle>
+            <CardDescription>Loan portfolio overview</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="size-4 text-green-500" />
-                  <span className="text-sm">Approve</span>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="size-4 text-green-500" />
+                    <span className="text-sm">Approve</span>
+                  </div>
+                  <span className="font-bold">{stats.approve_count}</span>
                 </div>
-                <span className="font-bold">{stats.approve_count}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Clock className="size-4 text-yellow-500" />
-                  <span className="text-sm">Review</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="size-4 text-yellow-500" />
+                    <span className="text-sm">Review</span>
+                  </div>
+                  <span className="font-bold">{stats.review_count}</span>
                 </div>
-                <span className="font-bold">{stats.review_count}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <XCircle className="size-4 text-red-500" />
-                  <span className="text-sm">Decline</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="size-4 text-red-500" />
+                    <span className="text-sm">Decline</span>
+                  </div>
+                  <span className="font-bold">{stats.decline_count}</span>
                 </div>
-                <span className="font-bold">{stats.decline_count}</span>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Score Components</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ML Model</span>
-                <span className="font-medium">70%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Vision Analysis</span>
-                <span className="font-medium">15%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">NLP Analysis</span>
-                <span className="font-medium">15%</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Loan Portfolio</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Active Loans</span>
-                <span className="font-medium">{stats.active_loans}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Current (DPD 0)</span>
-                <span className="font-medium">{stats.current_loans}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Past Due</span>
-                <span className="font-medium">{stats.past_due_loans}</span>
+              <hr className="border-muted" />
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Active Loans</span>
+                  <span className="font-medium">{stats.active_loans}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Current (DPD 0)</span>
+                  <span className="font-medium">{stats.current_loans}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Past Due</span>
+                  <span className="font-medium">{stats.past_due_loans}</span>
+                </div>
               </div>
             </div>
           </CardContent>

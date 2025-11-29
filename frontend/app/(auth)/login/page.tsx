@@ -1,5 +1,5 @@
-import { LoginForm } from "@/components/auth/login-form"
-import Image from "next/image"
+import { LoginForm } from "@/components/auth/login-form";
+import Image from "next/image";
 
 export default function LoginPage() {
   return (
@@ -38,15 +38,15 @@ export default function LoginPage() {
               />
             </div>
             <h2 className="text-3xl font-bold text-foreground/80 mb-4">
-              Credit Risk Intelligence
+              Credit Risk Assessment
             </h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Harness the power of AI to make smarter lending decisions.
-              Analyze borrower risk with ML, vision, and NLP modules.
+              Harness the power of AI to make smarter lending decisions. Analyze
+              borrower risk with ML, vision, and NLP modules.
             </p>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

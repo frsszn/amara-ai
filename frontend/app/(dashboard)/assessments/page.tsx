@@ -9,7 +9,26 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Search,
   CheckCircle,
@@ -19,8 +38,9 @@ import {
   Eye,
   MessageSquare,
   Loader2,
+  Plus,
 } from "lucide-react"
-import { getAssessments, formatCurrency } from "@/lib/data/api"
+import { getAssessments, formatCurrency, createAssessment, type CreateAssessmentRequest, type AssessmentResult } from "@/lib/data/api"
 import type { CreditAssessment } from "@/lib/types"
 
 function getRiskBadgeVariant(risk: string | null) {
@@ -82,25 +102,66 @@ function formatDate(dateString: string | null): string {
   })
 }
 
+const initialFormData: CreateAssessmentRequest = {
+  loan_id: "",
+  customer_number: "",
+  principal_amount: 0,
+  outstanding_amount: 0,
+  dpd: 0,
+  marital_status: "single",
+  date_of_birth: "1990-01-01",
+  field_agent_notes: "",
+}
+
 export default function AssessmentsPage() {
   const [assessments, setAssessments] = useState<CreditAssessment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [formData, setFormData] = useState<CreateAssessmentRequest>(initialFormData)
+  const [submitting, setSubmitting] = useState(false)
+  const [result, setResult] = useState<AssessmentResult | null>(null)
+
+  async function fetchData() {
+    try {
+      const data = await getAssessments()
+      setAssessments(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load assessments")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const data = await getAssessments()
-        setAssessments(data)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load assessments")
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchData()
   }, [])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setResult(null)
+    try {
+      const assessmentResult = await createAssessment(formData)
+      setResult(assessmentResult)
+      // Refresh the list after successful creation
+      await fetchData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create assessment")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function handleInputChange(field: keyof CreateAssessmentRequest, value: string | number) {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  function resetForm() {
+    setFormData(initialFormData)
+    setResult(null)
+  }
 
   const filteredAssessments = assessments.filter((assessment) =>
     (assessment.purpose?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||

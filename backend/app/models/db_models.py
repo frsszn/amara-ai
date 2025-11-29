@@ -47,8 +47,11 @@ class Loan(Base):
     customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id", ondelete="CASCADE"))
     principal_amount = Column(Numeric(15, 2))
     outstanding_amount = Column(Numeric(15, 2))
+    interest_rate = Column(Numeric(5, 2))
+    tenure_months = Column(Integer)
     dpd = Column(Integer, default=0)
     status = Column(String(50), default="ACTIVE")
+    disbursement_date = Column(Date)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 

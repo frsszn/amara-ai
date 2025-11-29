@@ -87,6 +87,12 @@ async def init_db():
         expire_on_commit=False,
     )
 
+    # Create all tables if they don't exist
+    # Import models here to avoid circular imports
+    from app.models import db_models  # noqa: F401
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
 
 async def close_db():
     """Close database connections."""

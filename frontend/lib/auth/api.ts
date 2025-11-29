@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL =
+  "https://amara-backend-av4zyrs6ya-et.a.run.app/api/v1";
 
 export interface User {
   id: string;
@@ -25,16 +26,15 @@ export interface AuthResponse {
 }
 
 class AuthError extends Error {
-  constructor(
-    message: string,
-    public status: number
-  ) {
+  constructor(message: string, public status: number) {
     super(message);
     this.name = "AuthError";
   }
 }
 
-export async function login(credentials: LoginCredentials): Promise<AuthResponse> {
+export async function login(
+  credentials: LoginCredentials
+): Promise<AuthResponse> {
   const response = await fetch(`${API_URL}/auth/login/json`, {
     method: "POST",
     headers: {
@@ -44,7 +44,9 @@ export async function login(credentials: LoginCredentials): Promise<AuthResponse
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Login failed" }));
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Login failed" }));
     throw new AuthError(error.detail || "Login failed", response.status);
   }
 
@@ -61,7 +63,9 @@ export async function register(data: RegisterData): Promise<User> {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Registration failed" }));
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Registration failed" }));
     throw new AuthError(error.detail || "Registration failed", response.status);
   }
 

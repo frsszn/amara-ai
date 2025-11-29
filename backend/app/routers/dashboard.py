@@ -94,6 +94,24 @@ class DashboardStats(BaseModel):
     decline_count: int
 
 
+class ChartDataPoint(BaseModel):
+    name: str
+    value: int
+    fill: Optional[str] = None
+
+
+class RiskTrendPoint(BaseModel):
+    month: str
+    low: int
+    medium: int
+    high: int
+
+
+class ScoreDistributionPoint(BaseModel):
+    range: str
+    count: int
+
+
 @router.get("/dashboard/stats", response_model=DashboardStats)
 async def get_dashboard_stats(
     current_user: User = Depends(get_current_user),
@@ -313,3 +331,196 @@ async def list_assessments(
         )
 
     return assessments
+
+
+@router.get("/dashboard/charts/risk-distribution", response_model=list[ChartDataPoint])
+async def get_risk_distribution_chart(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get risk distribution data for pie chart."""
+    categories = [
+        ("LOW", "var(--chart-1)"),
+        ("MEDIUM", "var(--chart-2)"),
+        ("HIGH", "var(--chart-3)"),
+        ("VERY_HIGH", "var(--chart-4)"),
+    ]
+
+    result = []
+    for category, color in categories:
+        count_result = await db.execute(
+            select(func.count(CreditAssessment.id)).where(
+                CreditAssessment.final_risk_category == category
+            )
+        )
+        count = count_result.scalar() or 0
+        if count > 0:
+            result.append(ChartDataPoint(name=category, value=count, fill=color))
+
+    return result
+
+
+@router.get("/dashboard/charts/age-distribution", response_model=list[ChartDataPoint])
+async def get_age_distribution_chart(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get age group distribution for bar chart."""
+    # Calculate age groups from date_of_birth
+    today = date.today()
+
+    age_groups = {
+        "young": (18, 25),
+        "adult": (26, 35),
+        "mature": (36, 50),
+        "senior": (51, 100),
+    }
+
+    colors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"]
+    result = []
+
+    for i, (name, (min_age, max_age)) in enumerate(age_groups.items()):
+        min_date = today.replace(year=today.year - max_age - 1)
+        max_date = today.replace(year=today.year - min_age)
+
+        count_result = await db.execute(
+            select(func.count(Customer.id)).where(
+                Customer.date_of_birth.between(min_date, max_date)
+            )
+        )
+        count = count_result.scalar() or 0
+        result.append(ChartDataPoint(name=name, value=count, fill=colors[i]))
+
+    return result
+
+
+@router.get("/dashboard/charts/loan-status", response_model=list[ChartDataPoint])
+async def get_loan_status_chart(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get loan status distribution for donut chart."""
+    statuses = [
+        ("CURRENT", "var(--chart-1)"),
+        ("PAST_DUE", "var(--chart-2)"),
+        ("CLOSED", "var(--chart-3)"),
+    ]
+
+    result = []
+    for status, color in statuses:
+        count_result = await db.execute(
+            select(func.count(Loan.id)).where(Loan.status == status)
+        )
+        count = count_result.scalar() or 0
+        if count > 0:
+            result.append(ChartDataPoint(name=status, value=count, fill=color))
+
+    return result
+
+
+@router.get("/dashboard/charts/recommendations", response_model=list[ChartDataPoint])
+async def get_recommendations_chart(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get recommendation distribution for bar chart."""
+    recommendations = [
+        ("APPROVE", "var(--chart-1)"),
+        ("REVIEW", "var(--chart-2)"),
+        ("REJECT", "var(--chart-3)"),
+    ]
+
+    result = []
+    for rec, color in recommendations:
+        count_result = await db.execute(
+            select(func.count(CreditAssessment.id)).where(
+                CreditAssessment.loan_recommendation == rec
+            )
+        )
+        count = count_result.scalar() or 0
+        result.append(ChartDataPoint(name=rec, value=count, fill=color))
+
+    return result
+
+
+@router.get("/dashboard/charts/score-distribution", response_model=list[ScoreDistributionPoint])
+async def get_score_distribution_chart(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get credit score distribution for histogram."""
+    ranges = [
+        ("0-20", 0, 0.2),
+        ("20-40", 0.2, 0.4),
+        ("40-60", 0.4, 0.6),
+        ("60-80", 0.6, 0.8),
+        ("80-100", 0.8, 1.0),
+    ]
+
+    result = []
+    for range_name, min_score, max_score in ranges:
+        count_result = await db.execute(
+            select(func.count(CreditAssessment.id)).where(
+                CreditAssessment.final_score >= min_score,
+                CreditAssessment.final_score < max_score
+            )
+        )
+        count = count_result.scalar() or 0
+        result.append(ScoreDistributionPoint(range=range_name, count=count))
+
+    return result
+
+
+@router.get("/dashboard/charts/marital-status", response_model=list[ChartDataPoint])
+async def get_marital_status_chart(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get marital status distribution."""
+    statuses = [
+        ("MARRIED", "var(--chart-1)"),
+        ("WIDOWED", "var(--chart-2)"),
+        ("SINGLE", "var(--chart-3)"),
+        ("DIVORCED", "var(--chart-4)"),
+    ]
+
+    result = []
+    for status, color in statuses:
+        count_result = await db.execute(
+            select(func.count(Customer.id)).where(
+                Customer.marital_status == status
+            )
+        )
+        count = count_result.scalar() or 0
+        if count > 0:
+            result.append(ChartDataPoint(name=status, value=count, fill=color))
+
+    return result
+
+
+@router.get("/dashboard/charts/outstanding-by-risk", response_model=list[ChartDataPoint])
+async def get_outstanding_by_risk_chart(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get total outstanding amount by risk category."""
+    categories = [
+        ("LOW", "var(--chart-1)"),
+        ("MEDIUM", "var(--chart-2)"),
+        ("HIGH", "var(--chart-3)"),
+        ("VERY_HIGH", "var(--chart-4)"),
+    ]
+
+    result = []
+    for category, color in categories:
+        sum_result = await db.execute(
+            select(func.coalesce(func.sum(Loan.outstanding_amount), 0))
+            .select_from(Loan)
+            .join(CreditAssessment, Loan.id == CreditAssessment.loan_id)
+            .where(CreditAssessment.final_risk_category == category)
+        )
+        total = int(sum_result.scalar() or 0)
+        if total > 0:
+            result.append(ChartDataPoint(name=category, value=total, fill=color))
+
+    return result
