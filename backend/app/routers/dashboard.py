@@ -148,7 +148,7 @@ async def get_dashboard_stats(
     avg_score_result = await db.execute(
         select(func.coalesce(func.avg(CreditAssessment.final_score), 0))
     )
-    avg_credit_score = float(avg_score_result.scalar() or 0) * 100  # Convert to 0-100
+    avg_credit_score = float(avg_score_result.scalar() or 0)
 
     # Risk category counts
     high_risk_result = await db.execute(
@@ -315,10 +315,10 @@ async def list_assessments(
                 id=str(row.id),
                 customer_number=row.customer_number,
                 loan_id=row.loan_id,
-                final_score=float(row.final_score) * 100 if row.final_score else None,
-                ml_score=float(row.ml_score) * 100 if row.ml_score else None,
-                vision_score=float(row.vision_score) * 100 if row.vision_score else None,
-                nlp_score=float(row.nlp_score) * 100 if row.nlp_score else None,
+                final_score=float(row.final_score) if row.final_score else None,
+                ml_score=float(row.ml_score) if row.ml_score else None,
+                vision_score=float(row.vision_score) if row.vision_score else None,
+                nlp_score=float(row.nlp_score) if row.nlp_score else None,
                 risk_category=row.final_risk_category,
                 recommendation=row.loan_recommendation,
                 assessed_at=row.created_at.isoformat() if row.created_at else None,
