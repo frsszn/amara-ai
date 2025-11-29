@@ -4,6 +4,13 @@
 
 ---
 
+
+<p align="center">
+  <img src="https://assets.skilvul.com/users/cks2n8tk218ld0722843jlqaj/showcases/ckx3ld48jpbqs0822bg98b2e1-1639334468354.png" width=400 align="center">
+</p>
+<h1 align="center">
+<h1 align="center">
+
 # Amara AI
 
 Credit risk assessment platform for microfinance lending. Combines ML predictions with Gemini AI analysis to evaluate loan applications.
