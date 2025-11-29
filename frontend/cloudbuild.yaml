@@ -1,0 +1,12 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=https://amara-backend-997736185431.asia-southeast2.run.app/api/v1'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/amara-frontend'
+      - '.'
+
+images:
+  - 'gcr.io/$PROJECT_ID/amara-frontend'
