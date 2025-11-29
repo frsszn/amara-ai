@@ -25,7 +25,6 @@ export interface CreditAssessment {
   vision_score: number | null
   nlp_score: number | null
   risk_category: "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH" | null
-  recommendation: "APPROVE" | "REVIEW" | "REJECT" | "DECLINE" | null
   assessed_at: string | null
   purpose?: string | null
   principal_amount?: number | null
@@ -48,7 +47,6 @@ export interface Borrower {
   vision_score: number | null
   nlp_score: number | null
   risk_category: string | null
-  recommendation: string | null
 }
 
 export interface BorrowerWithLoan extends Customer {
@@ -67,7 +65,4 @@ export interface DashboardStats {
   active_loans: number
   current_loans: number
   past_due_loans: number
-  approve_count: number
-  review_count: number
-  decline_count: number
 }

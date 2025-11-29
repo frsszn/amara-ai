@@ -37,7 +37,7 @@ def _parse_json_response(text: str) -> dict:
 
 def assess_single_image(image_path: str, asset_type: str) -> float:
     """
-    Assess a single image using Gemini Vision.
+    Assess a single image using Gemini Vision from file path.
     Returns score 0-1 where 1 = good condition/low risk.
     """
     client = get_gemini_client()
@@ -53,15 +53,56 @@ def assess_single_image(image_path: str, asset_type: str) -> float:
         from PIL import Image
 
         img = Image.open(path)
+        return _assess_image_object(client, img, asset_type)
 
+    except Exception as e:
+        print(f"Error assessing {asset_type} image: {e}")
+        return 0.5
+
+
+def assess_base64_image(base64_data: str, asset_type: str) -> float:
+    """
+    Assess a base64 encoded image using Gemini Vision.
+    Returns score 0-1 where 1 = good condition/low risk.
+    """
+    client = get_gemini_client()
+    if client is None:
+        return 0.5
+
+    try:
+        import base64
+        import io
+        from PIL import Image
+
+        # Handle data URL format (data:image/jpeg;base64,...)
+        if "," in base64_data:
+            base64_data = base64_data.split(",")[1]
+
+        # Decode base64 to image
+        image_bytes = base64.b64decode(base64_data)
+        img = Image.open(io.BytesIO(image_bytes))
+        return _assess_image_object(client, img, asset_type)
+
+    except Exception as e:
+        print(f"Error assessing {asset_type} base64 image: {e}")
+        return 0.5
+
+
+def _assess_image_object(client, img, asset_type: str) -> float:
+    """
+    Internal function to assess a PIL Image object.
+    """
+    try:
         prompt = (
-            f"You are an asset assessor. Provide a risk score (0-1) for this {asset_type} image. "
-            "Score 1 means the asset condition is very good/very low risk, and 0 means the asset is very poor/very high risk. "
+            f"You are an asset assessor for microfinance loans. Analyze this {asset_type} image. "
+            "Evaluate the condition, quality, and economic indicators visible. "
+            "Score 1 means excellent condition/low risk (well-maintained, prosperous signs). "
+            "Score 0 means poor condition/high risk (deteriorated, concerning signs). "
             'Provide output ONLY in JSON format: {"vision_score": 0.XX}'
         )
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.0-flash",
             contents=[prompt, img]
         )
 
@@ -69,16 +110,19 @@ def assess_single_image(image_path: str, asset_type: str) -> float:
         return float(data.get("vision_score", 0.5))
 
     except Exception as e:
-        print(f"Error assessing {asset_type} image: {e}")
+        print(f"Error in Gemini vision assessment: {e}")
         return 0.5
 
 
 def get_dual_vision_risk_score(
-    business_image_path: Optional[str],
-    home_image_path: Optional[str],
+    business_image_path: Optional[str] = None,
+    home_image_path: Optional[str] = None,
+    business_image_base64: Optional[str] = None,
+    home_image_base64: Optional[str] = None,
 ) -> tuple[Optional[float], Optional[float], float]:
     """
     Assess business and home images using Gemini Vision.
+    Supports both file paths (server-side) and base64 encoded images (frontend).
     Returns tuple of (business_score, home_score, combined_score).
     Combined score uses 50-50 weighting.
     """
@@ -86,11 +130,19 @@ def get_dual_vision_risk_score(
     home_score = None
     scores = []
 
-    if business_image_path:
+    # Business image - prefer base64 over file path
+    if business_image_base64:
+        business_score = assess_base64_image(business_image_base64, "Business")
+        scores.append(business_score)
+    elif business_image_path:
         business_score = assess_single_image(business_image_path, "Business")
         scores.append(business_score)
 
-    if home_image_path:
+    # Home image - prefer base64 over file path
+    if home_image_base64:
+        home_score = assess_base64_image(home_image_base64, "Home")
+        scores.append(home_score)
+    elif home_image_path:
         home_score = assess_single_image(home_image_path, "Home")
         scores.append(home_score)
 

@@ -7,7 +7,6 @@ from app.models.assessment import (
     VisionScoreResult,
     NLPScoreResult,
     get_risk_category,
-    get_recommendation,
 )
 from app.services.ml_inference import predict_default_probability
 from app.services.gemini_service import get_dual_vision_risk_score, get_nlp_risk_score
@@ -72,7 +71,7 @@ def generate_explanation(
     vision_score: Optional[float],
     nlp_score: Optional[float],
     final_score: float,
-    recommendation: str,
+    risk_category: str,
 ) -> str:
     """Generate human-readable explanation of the assessment."""
     parts = []
@@ -103,8 +102,8 @@ def generate_explanation(
         else:
             parts.append("Field agent notes indicate potential issues.")
 
-    # Final recommendation
-    parts.append(f"Overall risk score: {final_score:.1%}. Recommendation: {recommendation}.")
+    # Final score
+    parts.append(f"Overall risk score: {final_score:.1%}. Risk category: {risk_category}.")
 
     return " ".join(parts)
 
@@ -129,14 +128,21 @@ def assess_loan(request: LoanAssessmentRequest) -> AssessmentResponse:
         features_used=features_used,
     )
 
-    # 2. Vision Assessment (if images provided)
+    # 2. Vision Assessment (if images provided - base64 or file path)
     vision_result = None
     combined_vision_score = None
 
-    if request.business_image_path or request.home_image_path:
+    has_images = (
+        request.business_image_path or request.home_image_path or
+        request.business_image_base64 or request.home_image_base64
+    )
+
+    if has_images:
         business_score, home_score, combined_vision_score = get_dual_vision_risk_score(
-            request.business_image_path,
-            request.home_image_path,
+            business_image_path=request.business_image_path,
+            home_image_path=request.home_image_path,
+            business_image_base64=request.business_image_base64,
+            home_image_base64=request.home_image_base64,
         )
         vision_result = VisionScoreResult(
             business_score=business_score,
@@ -162,9 +168,8 @@ def assess_loan(request: LoanAssessmentRequest) -> AssessmentResponse:
         nlp_score=nlp_score,
     )
 
-    # 5. Determine Risk Category and Recommendation
+    # 5. Determine Risk Category
     risk_category = get_risk_category(final_score)
-    recommendation = get_recommendation(final_score)
 
     # 6. Generate Explanation
     explanation = generate_explanation(
@@ -172,7 +177,7 @@ def assess_loan(request: LoanAssessmentRequest) -> AssessmentResponse:
         vision_score=combined_vision_score,
         nlp_score=nlp_score,
         final_score=final_score,
-        recommendation=recommendation.value,
+        risk_category=risk_category.value,
     )
 
     return AssessmentResponse(
@@ -183,7 +188,6 @@ def assess_loan(request: LoanAssessmentRequest) -> AssessmentResponse:
         nlp_score=nlp_result,
         final_risk_score=final_score,
         risk_category=risk_category,
-        recommendation=recommendation,
         explanation=explanation,
         weights_used=weights_used,
     )

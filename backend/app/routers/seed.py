@@ -233,3 +233,43 @@ async def clear_seeded_data(
     await db.commit()
 
     return {"message": "All data cleared successfully"}
+
+
+@router.post("/recreate-tables")
+async def recreate_tables(
+    current_user = Depends(get_current_user)
+):
+    """Drop and recreate all tables. Use with extreme caution!"""
+    from app.services.database import _engine, Base
+    from app.models import db_models  # noqa: F401
+
+    async with _engine.begin() as conn:
+        # Drop all tables
+        await conn.run_sync(Base.metadata.drop_all)
+        # Recreate all tables
+        await conn.run_sync(Base.metadata.create_all)
+
+    return {"message": "All tables recreated successfully"}
+
+
+@router.post("/fix-schema")
+async def fix_schema(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Add missing columns to loans table."""
+    from sqlalchemy import text
+
+    try:
+        # Add missing columns if they don't exist
+        await db.execute(text("""
+            ALTER TABLE loans
+            ADD COLUMN IF NOT EXISTS interest_rate NUMERIC(5,2),
+            ADD COLUMN IF NOT EXISTS tenure_months INTEGER,
+            ADD COLUMN IF NOT EXISTS disbursement_date DATE;
+        """))
+        await db.commit()
+        return {"message": "Schema fixed - missing columns added"}
+    except Exception as e:
+        await db.rollback()
+        return {"error": str(e)}

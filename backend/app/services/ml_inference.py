@@ -43,7 +43,9 @@ def get_model():
 
         model_path = Path(settings.MODEL_PATH)
         if not model_path.is_absolute():
-            model_path = Path(__file__).parent.parent.parent.parent / model_path
+            # __file__ is at /app/app/services/ml_inference.py
+            # Go up 3 levels to /app where model/ directory is
+            model_path = Path(__file__).parent.parent.parent / model_path
 
         if not model_path.exists():
             raise FileNotFoundError(f"Model file not found at {model_path}")

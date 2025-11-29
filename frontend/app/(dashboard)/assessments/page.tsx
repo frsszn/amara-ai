@@ -31,14 +31,14 @@ import {
 } from "@/components/ui/select"
 import {
   Search,
-  CheckCircle,
-  Clock,
-  XCircle,
   Brain,
   Eye,
   MessageSquare,
   Loader2,
   Plus,
+  Camera,
+  Home,
+  X,
 } from "lucide-react"
 import { getAssessments, formatCurrency, createAssessment, type CreateAssessmentRequest, type AssessmentResult } from "@/lib/data/api"
 import type { CreditAssessment } from "@/lib/types"
@@ -54,40 +54,6 @@ function getRiskBadgeVariant(risk: string | null) {
       return "destructive"
     default:
       return "outline"
-  }
-}
-
-function getRecommendationDetails(rec: string | null) {
-  switch (rec) {
-    case "APPROVE":
-      return {
-        icon: CheckCircle,
-        color: "text-green-500",
-        bg: "bg-green-50",
-        label: "Approved",
-      }
-    case "REVIEW":
-      return {
-        icon: Clock,
-        color: "text-yellow-500",
-        bg: "bg-yellow-50",
-        label: "Under Review",
-      }
-    case "DECLINE":
-    case "REJECT":
-      return {
-        icon: XCircle,
-        color: "text-red-500",
-        bg: "bg-red-50",
-        label: "Declined",
-      }
-    default:
-      return {
-        icon: Clock,
-        color: "text-gray-500",
-        bg: "bg-gray-50",
-        label: "Unknown",
-      }
   }
 }
 
@@ -111,6 +77,25 @@ const initialFormData: CreateAssessmentRequest = {
   marital_status: "single",
   date_of_birth: "1990-01-01",
   field_agent_notes: "",
+  business_image_base64: undefined,
+  home_image_base64: undefined,
+}
+
+interface ImageState {
+  business: { base64: string; preview: string } | null;
+  home: { base64: string; preview: string } | null;
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function AssessmentsPage() {
@@ -122,6 +107,7 @@ export default function AssessmentsPage() {
   const [formData, setFormData] = useState<CreateAssessmentRequest>(initialFormData)
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<AssessmentResult | null>(null)
+  const [images, setImages] = useState<ImageState>({ business: null, home: null })
 
   async function fetchData() {
     try {
@@ -158,8 +144,46 @@ export default function AssessmentsPage() {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  async function handleImageUpload(type: 'business' | 'home', file: File | null) {
+    if (!file) {
+      setImages(prev => ({ ...prev, [type]: null }));
+      setFormData(prev => ({
+        ...prev,
+        [type === 'business' ? 'business_image_base64' : 'home_image_base64']: undefined,
+      }));
+      return;
+    }
+
+    try {
+      const base64 = await fileToBase64(file);
+      const preview = URL.createObjectURL(file);
+      setImages(prev => ({ ...prev, [type]: { base64, preview } }));
+      setFormData(prev => ({
+        ...prev,
+        [type === 'business' ? 'business_image_base64' : 'home_image_base64']: base64,
+      }));
+    } catch (err) {
+      console.error('Failed to process image:', err);
+    }
+  }
+
+  function removeImage(type: 'business' | 'home') {
+    if (images[type]?.preview) {
+      URL.revokeObjectURL(images[type]!.preview);
+    }
+    setImages(prev => ({ ...prev, [type]: null }));
+    setFormData(prev => ({
+      ...prev,
+      [type === 'business' ? 'business_image_base64' : 'home_image_base64']: undefined,
+    }));
+  }
+
   function resetForm() {
+    // Clean up image preview URLs
+    if (images.business?.preview) URL.revokeObjectURL(images.business.preview);
+    if (images.home?.preview) URL.revokeObjectURL(images.home.preview);
     setFormData(initialFormData)
+    setImages({ business: null, home: null })
     setResult(null)
   }
 
@@ -168,9 +192,10 @@ export default function AssessmentsPage() {
     (assessment.customer_number?.toLowerCase() || "").includes(searchTerm.toLowerCase())
   )
 
-  const approveCount = assessments.filter((a) => a.recommendation === "APPROVE").length
-  const reviewCount = assessments.filter((a) => a.recommendation === "REVIEW").length
-  const declineCount = assessments.filter((a) => a.recommendation === "REJECT" || a.recommendation === "DECLINE").length
+  // Count by risk category
+  const lowRiskCount = assessments.filter((a) => a.risk_category === "LOW").length
+  const mediumRiskCount = assessments.filter((a) => a.risk_category === "MEDIUM").length
+  const highRiskCount = assessments.filter((a) => a.risk_category === "HIGH" || a.risk_category === "VERY_HIGH").length
 
   if (loading) {
     return (
@@ -219,15 +244,289 @@ export default function AssessmentsPage() {
         </div>
         <div className="flex gap-2">
           <Badge variant="outline" className="bg-green-50">
-            {approveCount} Approved
+            {lowRiskCount} Low Risk
           </Badge>
           <Badge variant="outline" className="bg-yellow-50">
-            {reviewCount} Review
+            {mediumRiskCount} Medium Risk
           </Badge>
           <Badge variant="outline" className="bg-red-50">
-            {declineCount} Declined
+            {highRiskCount} High Risk
           </Badge>
         </div>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="size-4 mr-2" />
+              New Assessment
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create Credit Assessment</DialogTitle>
+              <DialogDescription>
+                Enter loan and customer details to run AI-powered credit risk assessment
+              </DialogDescription>
+            </DialogHeader>
+
+            {result ? (
+              <div className="space-y-4">
+                <Card className={result.risk_category === "LOW" ? "border-green-500" : result.risk_category === "MEDIUM" ? "border-yellow-500" : "border-red-500"}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center justify-between">
+                      Assessment Result
+                      <Badge variant={getRiskBadgeVariant(result.risk_category)}>
+                        {result.risk_category} RISK
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                      <div className="p-3 bg-muted rounded-lg">
+                        <Brain className="size-4 mx-auto mb-1 text-purple-500" />
+                        <div className="text-xs text-muted-foreground">ML Score</div>
+                        <div className="text-xl font-bold">{(result.ml_score.probability_of_default * 100).toFixed(1)}%</div>
+                      </div>
+                      {result.vision_score && (
+                        <div className="p-3 bg-muted rounded-lg">
+                          <Eye className="size-4 mx-auto mb-1 text-blue-500" />
+                          <div className="text-xs text-muted-foreground">Vision Score</div>
+                          <div className="text-xl font-bold">{(result.vision_score.combined_score * 100).toFixed(1)}%</div>
+                          {(result.vision_score.business_score || result.vision_score.home_score) && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {result.vision_score.business_score && `Biz: ${(result.vision_score.business_score * 100).toFixed(0)}%`}
+                              {result.vision_score.business_score && result.vision_score.home_score && ' | '}
+                              {result.vision_score.home_score && `Home: ${(result.vision_score.home_score * 100).toFixed(0)}%`}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {result.nlp_score && (
+                        <div className="p-3 bg-muted rounded-lg">
+                          <MessageSquare className="size-4 mx-auto mb-1 text-green-500" />
+                          <div className="text-xs text-muted-foreground">NLP Score</div>
+                          <div className="text-xl font-bold">{(result.nlp_score.sentiment_score * 100).toFixed(1)}%</div>
+                        </div>
+                      )}
+                      <div className="p-3 bg-muted rounded-lg">
+                        <div className="text-xs text-muted-foreground">Final Risk</div>
+                        <div className="text-xl font-bold">{(result.final_risk_score * 100).toFixed(1)}%</div>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg">
+                      <div className="text-sm font-medium mb-1">Explanation</div>
+                      <p className="text-sm text-muted-foreground">{result.explanation}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <DialogFooter>
+                  <Button variant="outline" onClick={resetForm}>Create Another</Button>
+                  <Button onClick={() => setDialogOpen(false)}>Done</Button>
+                </DialogFooter>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="loan_id">Loan ID *</Label>
+                    <Input
+                      id="loan_id"
+                      placeholder="LN123456"
+                      value={formData.loan_id}
+                      onChange={(e) => handleInputChange("loan_id", e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="customer_number">Customer Number *</Label>
+                    <Input
+                      id="customer_number"
+                      placeholder="CUST001"
+                      value={formData.customer_number}
+                      onChange={(e) => handleInputChange("customer_number", e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="principal_amount">Principal Amount (IDR) *</Label>
+                    <Input
+                      id="principal_amount"
+                      type="number"
+                      placeholder="5000000"
+                      value={formData.principal_amount || ""}
+                      onChange={(e) => handleInputChange("principal_amount", parseFloat(e.target.value) || 0)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="outstanding_amount">Outstanding Amount (IDR) *</Label>
+                    <Input
+                      id="outstanding_amount"
+                      type="number"
+                      placeholder="3000000"
+                      value={formData.outstanding_amount || ""}
+                      onChange={(e) => handleInputChange("outstanding_amount", parseFloat(e.target.value) || 0)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="dpd">Days Past Due *</Label>
+                    <Input
+                      id="dpd"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={formData.dpd}
+                      onChange={(e) => handleInputChange("dpd", parseInt(e.target.value) || 0)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="marital_status">Marital Status *</Label>
+                    <Select
+                      value={formData.marital_status}
+                      onValueChange={(value) => handleInputChange("marital_status", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="single">Single</SelectItem>
+                        <SelectItem value="married">Married</SelectItem>
+                        <SelectItem value="divorced">Divorced</SelectItem>
+                        <SelectItem value="widowed">Widowed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="date_of_birth">Date of Birth *</Label>
+                    <Input
+                      id="date_of_birth"
+                      type="date"
+                      value={formData.date_of_birth}
+                      onChange={(e) => handleInputChange("date_of_birth", e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="field_agent_notes">Field Agent Notes (Optional)</Label>
+                  <Textarea
+                    id="field_agent_notes"
+                    placeholder="Enter any observations from field visit..."
+                    value={formData.field_agent_notes || ""}
+                    onChange={(e) => handleInputChange("field_agent_notes", e.target.value)}
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">Notes will be analyzed by NLP module for sentiment and risk indicators</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Photo Evidence (Optional)</Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Upload photos for Gemini Vision AI analysis of business and home conditions
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Business Photo */}
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium flex items-center gap-2">
+                        <Camera className="size-4" />
+                        Business Photo
+                      </div>
+                      {images.business ? (
+                        <div className="relative">
+                          <img
+                            src={images.business.preview}
+                            alt="Business preview"
+                            className="w-full h-32 object-cover rounded-lg border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage('business')}
+                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50">
+                          <Camera className="size-8 text-muted-foreground mb-2" />
+                          <span className="text-xs text-muted-foreground">Click to upload</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleImageUpload('business', e.target.files?.[0] || null)}
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {/* Home Photo */}
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium flex items-center gap-2">
+                        <Home className="size-4" />
+                        Home Photo
+                      </div>
+                      {images.home ? (
+                        <div className="relative">
+                          <img
+                            src={images.home.preview}
+                            alt="Home preview"
+                            className="w-full h-32 object-cover rounded-lg border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage('home')}
+                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50">
+                          <Home className="size-8 text-muted-foreground mb-2" />
+                          <span className="text-xs text-muted-foreground">Click to upload</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleImageUpload('home', e.target.files?.[0] || null)}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? (
+                      <>
+                        <Loader2 className="size-4 mr-2 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="size-4 mr-2" />
+                        Run Assessment
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
 
       {filteredAssessments.length === 0 ? (
@@ -240,11 +539,7 @@ export default function AssessmentsPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {filteredAssessments.map((assessment) => {
-            const recDetails = getRecommendationDetails(assessment.recommendation)
-            const RecIcon = recDetails.icon
-
-            return (
+          {filteredAssessments.map((assessment) => (
               <Card key={assessment.id}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
@@ -259,13 +554,11 @@ export default function AssessmentsPage() {
                         Assessment #{assessment.id.substring(0, 8)} | {formatDate(assessment.assessed_at)}
                       </CardDescription>
                     </div>
-                    <div
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${recDetails.bg}`}
-                    >
-                      <RecIcon className={`size-4 ${recDetails.color}`} />
-                      <span className={`text-sm font-medium ${recDetails.color}`}>
-                        {recDetails.label}
-                      </span>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold">
+                        {assessment.final_score ? (assessment.final_score * 100).toFixed(0) : "N/A"}%
+                      </div>
+                      <div className="text-xs text-muted-foreground">Risk Score</div>
                     </div>
                   </div>
                 </CardHeader>

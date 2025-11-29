@@ -27,7 +27,7 @@ async def create_assessment(
     - Gemini Vision analysis (if images provided)
     - Gemini NLP analysis (if field agent notes provided)
 
-    Returns a comprehensive risk assessment with recommendation.
+    Returns a comprehensive risk score and category.
     """
     try:
         result = assess_loan(request)
@@ -75,11 +75,6 @@ async def get_risk_categories(
             {"name": RiskCategory.HIGH.value, "min_score": 0.5, "max_score": 0.7},
             {"name": RiskCategory.VERY_HIGH.value, "min_score": 0.7, "max_score": 1.0},
         ],
-        "recommendations": {
-            "APPROVE": "Score < 0.4",
-            "REVIEW": "Score 0.4 - 0.6",
-            "REJECT": "Score > 0.6",
-        },
         "weights": {
             "ml_model": "70%",
             "vision": "15%",

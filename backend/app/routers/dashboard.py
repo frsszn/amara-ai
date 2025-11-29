@@ -50,7 +50,6 @@ class AssessmentListResponse(BaseModel):
     vision_score: Optional[float] = None
     nlp_score: Optional[float] = None
     risk_category: Optional[str] = None
-    recommendation: Optional[str] = None
     assessed_at: Optional[str] = None
     purpose: Optional[str] = None
     principal_amount: Optional[float] = None
@@ -76,7 +75,6 @@ class BorrowerResponse(BaseModel):
     vision_score: Optional[float] = None
     nlp_score: Optional[float] = None
     risk_category: Optional[str] = None
-    recommendation: Optional[str] = None
 
 
 class DashboardStats(BaseModel):
@@ -89,9 +87,6 @@ class DashboardStats(BaseModel):
     active_loans: int
     current_loans: int
     past_due_loans: int
-    approve_count: int
-    review_count: int
-    decline_count: int
 
 
 class ChartDataPoint(BaseModel):
@@ -172,28 +167,6 @@ async def get_dashboard_stats(
     )
     medium_risk_count = medium_risk_result.scalar() or 0
 
-    # Recommendation counts
-    approve_result = await db.execute(
-        select(func.count(CreditAssessment.id)).where(
-            CreditAssessment.loan_recommendation == "APPROVE"
-        )
-    )
-    approve_count = approve_result.scalar() or 0
-
-    review_result = await db.execute(
-        select(func.count(CreditAssessment.id)).where(
-            CreditAssessment.loan_recommendation == "REVIEW"
-        )
-    )
-    review_count = review_result.scalar() or 0
-
-    decline_result = await db.execute(
-        select(func.count(CreditAssessment.id)).where(
-            CreditAssessment.loan_recommendation == "REJECT"
-        )
-    )
-    decline_count = decline_result.scalar() or 0
-
     return DashboardStats(
         total_borrowers=total_borrowers,
         total_outstanding=total_outstanding,
@@ -204,9 +177,6 @@ async def get_dashboard_stats(
         active_loans=active_loans,
         current_loans=current_loans,
         past_due_loans=past_due_loans,
-        approve_count=approve_count,
-        review_count=review_count,
-        decline_count=decline_count,
     )
 
 
@@ -234,7 +204,6 @@ async def list_borrowers(
             CreditAssessment.vision_score,
             CreditAssessment.nlp_score,
             CreditAssessment.final_risk_category,
-            CreditAssessment.loan_recommendation,
         )
         .select_from(Customer)
         .outerjoin(Loan, Customer.id == Loan.customer_id)
@@ -264,7 +233,6 @@ async def list_borrowers(
                 vision_score=float(row.vision_score) if row.vision_score else None,
                 nlp_score=float(row.nlp_score) if row.nlp_score else None,
                 risk_category=row.final_risk_category,
-                recommendation=row.loan_recommendation,
             )
         )
 
@@ -289,7 +257,6 @@ async def list_assessments(
             CreditAssessment.vision_score,
             CreditAssessment.nlp_score,
             CreditAssessment.final_risk_category,
-            CreditAssessment.loan_recommendation,
             CreditAssessment.created_at,
             Customer.purpose,
             Loan.principal_amount,
@@ -320,7 +287,6 @@ async def list_assessments(
                 vision_score=float(row.vision_score) if row.vision_score else None,
                 nlp_score=float(row.nlp_score) if row.nlp_score else None,
                 risk_category=row.final_risk_category,
-                recommendation=row.loan_recommendation,
                 assessed_at=row.created_at.isoformat() if row.created_at else None,
                 purpose=row.purpose,
                 principal_amount=float(row.principal_amount) if row.principal_amount else None,
@@ -414,31 +380,6 @@ async def get_loan_status_chart(
         count = count_result.scalar() or 0
         if count > 0:
             result.append(ChartDataPoint(name=status, value=count, fill=color))
-
-    return result
-
-
-@router.get("/dashboard/charts/recommendations", response_model=list[ChartDataPoint])
-async def get_recommendations_chart(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get recommendation distribution for bar chart."""
-    recommendations = [
-        ("APPROVE", "var(--chart-1)"),
-        ("REVIEW", "var(--chart-2)"),
-        ("REJECT", "var(--chart-3)"),
-    ]
-
-    result = []
-    for rec, color in recommendations:
-        count_result = await db.execute(
-            select(func.count(CreditAssessment.id)).where(
-                CreditAssessment.loan_recommendation == rec
-            )
-        )
-        count = count_result.scalar() or 0
-        result.append(ChartDataPoint(name=rec, value=count, fill=color))
 
     return result
 

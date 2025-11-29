@@ -1,5 +1,5 @@
 const API_URL =
-  "https://amara-backend-av4zyrs6ya-et.a.run.app/api/v1";
+  "https://amara-backend-997736185431.asia-southeast2.run.app/api/v1";
 
 export interface User {
   id: string;

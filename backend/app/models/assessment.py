@@ -11,12 +11,6 @@ class RiskCategory(str, Enum):
     VERY_HIGH = "VERY_HIGH"
 
 
-class LoanRecommendation(str, Enum):
-    APPROVE = "APPROVE"
-    REVIEW = "REVIEW"
-    REJECT = "REJECT"
-
-
 class BillData(BaseModel):
     amount: float
     paid_amount: float
@@ -34,8 +28,10 @@ class LoanAssessmentRequest(BaseModel):
     date_of_birth: str
     bills_data: list[BillData] = []
     field_agent_notes: Optional[str] = None
-    business_image_path: Optional[str] = None
-    home_image_path: Optional[str] = None
+    business_image_path: Optional[str] = None  # File path (server-side)
+    home_image_path: Optional[str] = None  # File path (server-side)
+    business_image_base64: Optional[str] = None  # Base64 encoded image (frontend)
+    home_image_base64: Optional[str] = None  # Base64 encoded image (frontend)
 
 
 class MLScoreResult(BaseModel):
@@ -62,7 +58,6 @@ class AssessmentResponse(BaseModel):
     nlp_score: Optional[NLPScoreResult] = None
     final_risk_score: float = Field(ge=0, le=1)
     risk_category: RiskCategory
-    recommendation: LoanRecommendation
     explanation: str
     weights_used: dict
 
@@ -76,12 +71,3 @@ def get_risk_category(score: float) -> RiskCategory:
         return RiskCategory.HIGH
     else:
         return RiskCategory.VERY_HIGH
-
-
-def get_recommendation(score: float) -> LoanRecommendation:
-    if score < 0.4:
-        return LoanRecommendation.APPROVE
-    elif score < 0.6:
-        return LoanRecommendation.REVIEW
-    else:
-        return LoanRecommendation.REJECT
