@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     DB_PASS: str = os.getenv("DB_PASS", "")
     DB_NAME: str = os.getenv("DB_NAME", "amara")
 
+    # Gemini AI
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+
+    # ML Model
+    MODEL_PATH: str = os.getenv("MODEL_PATH", "model/best_model_dt.pkl")
+
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
