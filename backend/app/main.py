@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import auth, assessment
+from app.routers import auth, assessment, dashboard
 from app.services.database import init_db, close_db, check_db_connection
 
 
@@ -37,6 +37,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(assessment.router, prefix=settings.API_V1_PREFIX)
+app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

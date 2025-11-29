@@ -4,8 +4,6 @@ import { useEffect, useState } from "react"
 import {
   LayoutDashboard,
   Users,
-  Settings,
-  BarChart3,
   FileText,
   LogOut,
   ChevronUp,
@@ -56,11 +54,6 @@ const mainNavItems = [
     title: "Assessments",
     url: "/assessments",
     icon: FileText,
-  },
-  {
-    title: "Analytics",
-    url: "/analytics",
-    icon: BarChart3,
   },
 ]
 
@@ -205,11 +198,6 @@ export function AppSidebar() {
                     <Badge variant={getRoleBadgeVariant(displayRole)} className="ml-auto capitalize">
                       {displayRole}
                     </Badge>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 size-4" />
-                    Account Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">

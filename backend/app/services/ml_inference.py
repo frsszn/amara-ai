@@ -11,9 +11,36 @@ from app.models.assessment import BillData
 _model = None
 
 
+def _apply_sklearn_compatibility():
+    """
+    Apply sklearn version compatibility patches.
+    Handles cases where model was trained with older sklearn version.
+    """
+    try:
+        # Fix for _RemainderColsList compatibility (sklearn < 1.2 → sklearn >= 1.2)
+        from sklearn.compose._column_transformer import _RemainderColsList
+    except ImportError:
+        # If sklearn doesn't have this class, try to create a compatible one
+        try:
+            import sklearn.compose._column_transformer as ct_module
+            if not hasattr(ct_module, '_RemainderColsList'):
+                # Create a simple list subclass for compatibility
+                class _RemainderColsList(list):
+                    """Compatibility shim for older sklearn models."""
+                    def __init__(self, *args, **kwargs):
+                        super().__init__(*args)
+                        self.future_dtype = kwargs.get('future_dtype', 'str')
+                ct_module._RemainderColsList = _RemainderColsList
+        except Exception:
+            pass
+
+
 def get_model():
     global _model
     if _model is None:
+        # Apply compatibility patches before loading
+        _apply_sklearn_compatibility()
+
         model_path = Path(settings.MODEL_PATH)
         if not model_path.is_absolute():
             model_path = Path(__file__).parent.parent.parent.parent / model_path

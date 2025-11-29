@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://amara-frontend-997736185431.asia-southeast2.run.app",
     ]
 
     class Config:
