@@ -9,6 +9,7 @@ import {
   FileText,
   LogOut,
   ChevronUp,
+  Shield,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -32,10 +33,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/lib/auth/context"
 
 const mainNavItems = [
   {
@@ -60,14 +64,43 @@ const mainNavItems = [
   },
 ]
 
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+}
+
+function getRoleBadgeVariant(role: string): "default" | "secondary" | "outline" {
+  switch (role) {
+    case "admin":
+      return "default"
+    case "analyst":
+      return "secondary"
+    default:
+      return "outline"
+  }
+}
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const { user, logout } = useAuth()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  const handleLogout = async () => {
+    await logout()
+  }
+
+  const displayName = user?.full_name || "User"
+  const displayEmail = user?.email || "user@example.com"
+  const displayRole = user?.role || "viewer"
+  const initials = getInitials(displayName)
 
   return (
     <Sidebar>
@@ -133,13 +166,13 @@ export function AppSidebar() {
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                   >
                     <Avatar className="size-8 rounded-lg">
-                      <AvatarImage src="/avatar.png" alt="User" />
-                      <AvatarFallback className="rounded-lg">U</AvatarFallback>
+                      <AvatarImage src="/avatar.png" alt={displayName} />
+                      <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
                     </Avatar>
                     <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">User</span>
+                      <span className="truncate font-semibold">{displayName}</span>
                       <span className="truncate text-xs text-muted-foreground">
-                        user@example.com
+                        {displayEmail}
                       </span>
                     </div>
                     <ChevronUp className="ml-auto size-4" />
@@ -151,12 +184,35 @@ export function AppSidebar() {
                   align="end"
                   sideOffset={4}
                 >
+                  <DropdownMenuLabel className="p-0 font-normal">
+                    <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                      <Avatar className="size-8 rounded-lg">
+                        <AvatarImage src="/avatar.png" alt={displayName} />
+                        <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                      </Avatar>
+                      <div className="grid flex-1 text-left text-sm leading-tight">
+                        <span className="truncate font-semibold">{displayName}</span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {displayEmail}
+                        </span>
+                      </div>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem disabled>
+                    <Shield className="mr-2 size-4" />
+                    <span>Role:</span>
+                    <Badge variant={getRoleBadgeVariant(displayRole)} className="ml-auto capitalize">
+                      {displayRole}
+                    </Badge>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem>
                     <Settings className="mr-2 size-4" />
                     Account Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                     <LogOut className="mr-2 size-4" />
                     Log out
                   </DropdownMenuItem>
@@ -165,12 +221,12 @@ export function AppSidebar() {
             ) : (
               <SidebarMenuButton size="lg">
                 <Avatar className="size-8 rounded-lg">
-                  <AvatarFallback className="rounded-lg">U</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">User</span>
+                  <span className="truncate font-semibold">{displayName}</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    user@example.com
+                    {displayEmail}
                   </span>
                 </div>
                 <ChevronUp className="ml-auto size-4" />
