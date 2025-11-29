@@ -21,6 +21,9 @@ build/
 .mypy_cache/
 .ruff_cache/
 
+# IDE
+.vscode/
+
 # dependencies
 /node_modules
 /.pnp
